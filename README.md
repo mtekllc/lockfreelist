@@ -49,19 +49,6 @@ Frees all nodes in the list unconditionally, typically used for shutdown.
 ### `lfl_count_pending_cleanup(name, inst, ref, out)`
 Counts nodes that are logically removed but still have a non-zero reference count.
 
-```c
-/**
- * @brief count nodes that are logically removed but still held by references
- *
- * @param name list type name
- * @param inst list instance name
- * @param ref  field name of the atomic refcount in the node
- * @param out  integer variable to store the count of pending cleanup nodes
- *
- * @return none; result is written to the variable passed via `out`
- */
-```
-
 ## Example Use Case
 
 A test program is provided that:
