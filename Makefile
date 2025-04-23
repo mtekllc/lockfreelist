@@ -12,5 +12,8 @@ lfl_criterion: lfl_criterion.c lock_free_list.h
 
 clean:
 	rm -f lfl_sample lfl_criterion
+	
+check: lfl_criterion
+	./lfl_criterion  --verbose -j1
 
 .PHONY: all clean

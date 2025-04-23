@@ -338,3 +338,58 @@
                 } \
                 out = _pending; \
         } while (0)
+
+
+/**
+ * @brief atomically remove and return the head node of the list
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param item  local variable to receive the head node pointer
+ *
+ * @return the head node is logically removed and assigned to `item`; it is not freed
+ */
+
+#define lfl_pop_head(name, inst, item) \
+        struct name##_linked_list *item = NULL; \
+        do { \
+                item = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                if (!item) break; \
+                struct name##_linked_list *next = atomic_load_explicit(&item->next, memory_order_acquire); \
+                if (atomic_compare_exchange_weak_explicit(&(inst##_head), &item, next, \
+                    memory_order_release, memory_order_relaxed)) { \
+                        lfl_remove(name, inst, item); \
+                        break; \
+                } \
+        } while (0)
+
+/**
+ * @brief remove and return the last node in the list
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param item  local variable to receive the tail node pointer
+ *
+ * @return the last node is unlinked and logically removed, but not freed; caller may inspect it
+ */
+
+#define lfl_pop_tail(name, inst, item) \
+        struct name##_linked_list *item = NULL; \
+        do { \
+                struct name##_linked_list *prev = NULL; \
+                struct name##_linked_list *curr = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                while (curr) { \
+                        struct name##_linked_list *next = atomic_load_explicit(&curr->next, memory_order_acquire); \
+                        if (!next) { \
+                                item = curr; \
+                                break; \
+                        } \
+                        prev = curr; \
+                        curr = next; \
+                } \
+                if (!item) break; \
+                if (prev) atomic_store_explicit(&prev->next, NULL, memory_order_release); \
+                else atomic_store_explicit(&(inst##_head), NULL, memory_order_release); \
+                lfl_remove(name, inst, item); \
+        } while (0)
+

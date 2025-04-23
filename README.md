@@ -49,6 +49,30 @@ Frees all nodes in the list unconditionally, typically used for shutdown.
 ### `lfl_count_pending_cleanup(name, inst, ref, out)`
 Counts nodes that are logically removed but still have a non-zero reference count.
 
+### `lfl_pop_head(name, inst, item)`
+Atomically removes the head of the list and assigns the result to `item`.
+The node is logically removed but **not freed**. Caller is responsible for
+processing and eventually calling `lfl_delete()` or allowing it to be swept.
+
+### `lfl_pop_tail(name, inst, item)`
+Traverses and removes the last node in the list, assigning it to `item`.
+The node is unlinked and logically removed but **not freed**.
+
+Both macros return `NULL` (via `item`) if the list is empty.
+
+Example usage:
+
+```c
+lfl_pop_head(mytype, myqueue, node);
+if (node) {
+    // use node, delete when done
+    lfl_delete(mytype, myqueue, node);
+}
+```
+
+---
+
+
 ## Example Use Case
 
 A test program is provided that:

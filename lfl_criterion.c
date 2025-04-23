@@ -426,3 +426,62 @@ Test(lfl_lockfree, foreach_mixed_remove_delete_then_sweep)
         lfl_clear(test, stucklist);
 }
 
+Test(lfl_pop, pop_head_returns_first_node)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        lfl_add_tail(test, queue, n1);
+        n1->id = 100;
+        lfl_add_tail(test, queue, n2);
+        n2->id = 200;
+
+        lfl_pop_head(test, queue, head);
+        cr_assert_not_null(head, "Expected a node to be popped from head");
+        cr_expect_eq(head->id, 100, "Expected head node to have id 100, got %d", head->id);
+
+        lfl_delete(test, queue, head);
+        lfl_clear(test, queue);
+}
+
+Test(lfl_pop, pop_tail_returns_last_node)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        lfl_add_tail(test, queue, n1);
+        n1->id = 1;
+        lfl_add_tail(test, queue, n2);
+        n2->id = 2;
+        lfl_add_tail(test, queue, n3);
+        n3->id = 3;
+
+        lfl_pop_tail(test, queue, tail);
+        cr_assert_not_null(tail, "Expected a node to be popped from tail");
+        cr_expect_eq(tail->id, 3, "Expected tail node to have id 3, got %d", tail->id);
+
+        lfl_delete(test, queue, tail);
+        lfl_clear(test, queue);
+}
+
+Test(lfl_pop, pop_head_from_empty_returns_null)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        lfl_pop_head(test, queue, head);
+        cr_expect_null(head, "Expected NULL when popping head from an empty list");
+
+        lfl_clear(test, queue);
+}
+
+Test(lfl_pop, pop_tail_from_empty_returns_null)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        lfl_pop_tail(test, queue, tail);
+        cr_expect_null(tail, "Expected NULL when popping tail from an empty list");
+
+        lfl_clear(test, queue);
+}
