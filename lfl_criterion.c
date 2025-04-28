@@ -485,3 +485,23 @@ Test(lfl_pop, pop_tail_from_empty_returns_null)
 
         lfl_clear(test, queue);
 }
+
+struct container {
+        int metadata;
+        lfl_vars(test, innerlist);
+};
+
+Test(lfl_vars, vars_can_be_embedded_in_struct)
+{
+        struct container c;
+        lfl_init(test, c.innerlist);
+
+        lfl_add_tail(test, c.innerlist, n1);
+        n1->id = 42;
+
+        lfl_foreach(test, c.innerlist, item) {
+                cr_expect_eq(item->id, 42, "Expected embedded list node with id 42, got %d", item->id);
+        }
+
+        lfl_clear(test, c.innerlist);
+}

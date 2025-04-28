@@ -79,11 +79,11 @@
  * @param inst list instance name
  */
 #define lfl_vars(name, inst) \
-        _Atomic(struct name##_linked_list *) inst##_head = NULL; \
-        _Atomic(struct name##_linked_list *) inst##_tail = NULL
+        _Atomic(struct name ## _linked_list *) inst## _head; \
+        _Atomic(struct name ## _linked_list *) inst## _tail
 
 /**
- * @brief
+ * @brief declare head/tail pointers for a list instance as 'external'
  *
  * @param name
  * @param inst
@@ -93,7 +93,7 @@
         extern _Atomic(struct name ## _linked_list *) inst## _tail
 
 /**
- * @brief
+ * @brief declare head/tail pointers for a list instance as 'static'
  *
  * @param name
  * @param inst
