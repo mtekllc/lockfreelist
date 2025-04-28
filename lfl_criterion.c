@@ -505,3 +505,31 @@ Test(lfl_vars, vars_can_be_embedded_in_struct)
 
         lfl_clear(test, c.innerlist);
 }
+
+Test(lfl_integrity, add_delete_add_sequence)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        // add a node
+        lfl_add_tail(test, queue, n1);
+        n1->id = 1;
+
+        // delete it
+        lfl_delete(test, queue, n1);
+
+        // add another node after delete
+        lfl_add_tail(test, queue, n2);
+        n2->id = 2;
+
+        // check if new node is correctly added
+        int count = 0;
+        lfl_foreach(test, queue, item) {
+                cr_expect_eq(item->id, 2, "Expected new node with id 2 after delete, got %d", item->id);
+                count++;
+        }
+
+        cr_expect_eq(count, 1, "Expected exactly one node after add-delete-add sequence, got %d", count);
+
+        lfl_clear(test, queue);
+}

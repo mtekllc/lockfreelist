@@ -165,6 +165,7 @@
                                         &(inst##_head), &null_ptr, item, \
                                         memory_order_release, memory_order_relaxed)) { \
                                     atomic_store_explicit(&(inst##_tail), item, memory_order_release); \
+                                    atomic_store_explicit(&item->prev, NULL, memory_order_relaxed); \
                                     break; \
                                 } \
                         } else { \
@@ -172,6 +173,7 @@
                                 if (atomic_compare_exchange_weak_explicit( \
                                         &expected_tail->next, &next, item, \
                                         memory_order_release, memory_order_relaxed)) { \
+                                    atomic_store_explicit(&item->prev, expected_tail, memory_order_relaxed); \
                                     atomic_compare_exchange_weak_explicit( \
                                         &(inst##_tail), &expected_tail, item, \
                                         memory_order_release, memory_order_relaxed); \
@@ -197,10 +199,13 @@
                 do { \
                         old_head = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
                         atomic_store_explicit(&item->next, old_head, memory_order_relaxed); \
+                        atomic_store_explicit(&item->prev, NULL, memory_order_relaxed); \
                 } while (!atomic_compare_exchange_weak_explicit( \
                         &(inst##_head), &old_head, item, \
                         memory_order_release, memory_order_relaxed)); \
-                if (atomic_load_explicit(&(inst##_tail), memory_order_acquire) == NULL) { \
+                if (old_head) { \
+                        atomic_store_explicit(&old_head->prev, item, memory_order_release); \
+                } else { \
                         atomic_store_explicit(&(inst##_tail), item, memory_order_release); \
                 } \
         } while (0)
@@ -226,21 +231,20 @@
  */
 #define lfl_delete(name, inst, ptr) \
         do { \
-                struct name##_linked_list *prev = NULL; \
-                struct name##_linked_list *curr = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
-                while (curr) { \
-                        struct name##_linked_list *next = atomic_load_explicit(&curr->next, memory_order_acquire); \
-                        if (curr == ptr) { \
-                                if (prev) atomic_store_explicit(&prev->next, next, memory_order_release); \
-                                else atomic_store_explicit(&(inst##_head), next, memory_order_release); \
-                                free(curr); \
-                                break; \
-                        } \
-                        prev = curr; \
-                        curr = next; \
+                struct name##_linked_list *prev = atomic_load_explicit(&(ptr->prev), memory_order_acquire); \
+                struct name##_linked_list *next = atomic_load_explicit(&(ptr->next), memory_order_acquire); \
+                if (prev) { \
+                        atomic_store_explicit(&(prev->next), next, memory_order_release); \
+                } else { \
+                        atomic_store_explicit(&(inst##_head), next, memory_order_release); \
                 } \
+                if (next) { \
+                        atomic_store_explicit(&(next->prev), prev, memory_order_release); \
+                } else { \
+                        atomic_store_explicit(&(inst##_tail), prev, memory_order_release); \
+                } \
+                free(ptr); \
         } while (0)
-
 /**
  * @brief lock-free search through the list using a condition
  *
