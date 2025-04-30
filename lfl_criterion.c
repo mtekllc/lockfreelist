@@ -533,3 +533,74 @@ Test(lfl_integrity, add_delete_add_sequence)
 
         lfl_clear(test, queue);
 }
+
+Test(lfl_dualstage, init_fill_insert_with_ptr_macro)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        test_t *node = lfl_new(test);
+        node->id = 42;
+
+        lfl_add_tail_ptr(test, queue, node);
+
+        int found = 0;
+        lfl_foreach(test, queue, item) {
+                cr_expect_eq(item->id, 42, "expected node with id 42, got %d", item->id);
+                found++;
+        }
+        cr_expect_eq(found, 1, "expected one node in the list, found %d", found);
+
+        lfl_delete(test, queue, node);
+        lfl_clear(test, queue);
+}
+
+Test(lfl_dualstage, init_fill_insert_head_with_ptr_macro)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        test_t *node = lfl_new(test);
+        node->id = 24;
+
+        lfl_add_head_ptr(test, queue, node);
+
+        int found = 0;
+        lfl_foreach(test, queue, item) {
+                cr_expect_eq(item->id, 24, "expected node with id 24, got %d", item->id);
+                found++;
+        }
+        cr_expect_eq(found, 1, "expected one node in the list, found %d", found);
+
+        lfl_delete(test, queue, node);
+        lfl_clear(test, queue);
+}
+
+Test(lfl_dualstage, compound_insert_head_and_tail_with_ptr)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        test_t *first = lfl_new(test);
+        test_t *last = lfl_new(test);
+        first->id = 1;
+        last->id = 99;
+
+        lfl_add_head_ptr(test, queue, first);
+        lfl_add_tail_ptr(test, queue, last);
+
+        int seen_head = 0, seen_tail = 0, total = 0;
+        lfl_foreach(test, queue, item) {
+                if (item->id == 1) seen_head++;
+                if (item->id == 99) seen_tail++;
+                total++;
+        }
+
+        cr_expect_eq(seen_head, 1, "head node not found");
+        cr_expect_eq(seen_tail, 1, "tail node not found");
+        cr_expect_eq(total, 2, "expected two nodes, found %d", total);
+
+        lfl_delete(test, queue, first);
+        lfl_delete(test, queue, last);
+        lfl_clear(test, queue);
+}

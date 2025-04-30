@@ -105,6 +105,10 @@
 /* typing */
 #define lfl_type(name) struct name ## _linked_list
 
+/* allocating */
+#define lfl_new(name) \
+        ((lfl_type(name) *)calloc(1, sizeof(lfl_type(name))))
+
 /* for discrete operations */
 
 /* get the head */
@@ -207,6 +211,75 @@
                         atomic_store_explicit(&old_head->prev, item, memory_order_release); \
                 } else { \
                         atomic_store_explicit(&(inst##_tail), item, memory_order_release); \
+                } \
+        } while (0)
+
+/**
+ * @brief insert a pre-allocated and initialized node at the tail of the list
+ *
+ * @param name list type name
+ * @param inst list instance name
+ * @param ptr  pointer to an initialized node to insert
+ *
+ * @note unlike lfl_add_tail, this macro does not allocate memory; caller
+ *       must allocate and fully initialize the node before calling
+ */
+#define lfl_add_tail_ptr(name, inst, ptr) \
+        do { \
+                atomic_store_explicit(&ptr->next, NULL, memory_order_relaxed); \
+                atomic_store_explicit(&ptr->removed, 0, memory_order_relaxed); \
+                struct name##_linked_list *expected_tail; \
+                struct name##_linked_list *null_ptr = NULL; \
+                do { \
+                        expected_tail = atomic_load_explicit(&(inst##_tail), memory_order_acquire); \
+                        if (expected_tail == NULL) { \
+                                if (atomic_compare_exchange_weak_explicit( \
+                                        &(inst##_head), &null_ptr, ptr, \
+                                        memory_order_release, memory_order_relaxed)) { \
+                                    atomic_store_explicit(&(inst##_tail), ptr, memory_order_release); \
+                                    atomic_store_explicit(&ptr->prev, NULL, memory_order_relaxed); \
+                                    break; \
+                                } \
+                        } else { \
+                                struct name##_linked_list *next = NULL; \
+                                if (atomic_compare_exchange_weak_explicit( \
+                                        &expected_tail->next, &next, ptr, \
+                                        memory_order_release, memory_order_relaxed)) { \
+                                    atomic_store_explicit(&ptr->prev, expected_tail, memory_order_relaxed); \
+                                    atomic_compare_exchange_weak_explicit( \
+                                        &(inst##_tail), &expected_tail, ptr, \
+                                        memory_order_release, memory_order_relaxed); \
+                                    break; \
+                                } \
+                        } \
+                } while (1); \
+        } while (0)
+
+/**
+ * @brief insert a pre-allocated and initialized node at the head of the list
+ *
+ * @param name list type name
+ * @param inst list instance name
+ * @param ptr  pointer to an initialized node to insert
+ *
+ * @note unlike lfl_add_head, this macro does not allocate memory; caller
+ *       must allocate and fully initialize the node before calling
+ */
+#define lfl_add_head_ptr(name, inst, ptr) \
+        do { \
+                atomic_store_explicit(&ptr->removed, 0, memory_order_relaxed); \
+                struct name##_linked_list *old_head; \
+                do { \
+                        old_head = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                        atomic_store_explicit(&ptr->next, old_head, memory_order_relaxed); \
+                        atomic_store_explicit(&ptr->prev, NULL, memory_order_relaxed); \
+                } while (!atomic_compare_exchange_weak_explicit( \
+                        &(inst##_head), &old_head, ptr, \
+                        memory_order_release, memory_order_relaxed)); \
+                if (old_head) { \
+                        atomic_store_explicit(&old_head->prev, ptr, memory_order_release); \
+                } else { \
+                        atomic_store_explicit(&(inst##_tail), ptr, memory_order_release); \
                 } \
         } while (0)
 
