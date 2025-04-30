@@ -28,6 +28,31 @@ Initializes the list instance by setting head and tail to `NULL`.
 ### `lfl_add_head(name, inst, item)` / `lfl_add_tail(name, inst, item)`
 Appends a node to the head or tail of the list. The macro allocates and initializes the node.
 
+### Dual-stage insertion: `_ptr` variants
+In addition to the single-stage `lfl_add_head()` and `lfl_add_tail()` macros,
+this library provides two-stage insertion macros:
+
+- `lfl_add_head_ptr(name, inst, ptr)`
+- `lfl_add_tail_ptr(name, inst, ptr)`
+
+These variants **do not allocate memory internally**. Instead, they operate on
+pointers to pre-allocated and fully initialized nodes provided by the caller.
+
+This allows the caller to initialize application-level data **before** the node
+becomes visible to other threads, avoiding the race condition where readers
+might observe a partially populated structure.
+
+For convenience, the macro `lfl_new(name)` is available to allocate and zero-initialize
+a new node of the appropriate type.
+
+Example:
+
+```c
+test_t *node = lfl_new(test);
+node->id = 123;
+lfl_add_tail_ptr(mytype, myqueue, node);
+```
+
 ### `lfl_remove(name, inst, target)`
 Marks a node as logically removed by setting its `removed` flag. Intended for use with `lfl_sweep()`.
 
