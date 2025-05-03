@@ -1,5 +1,7 @@
 # lockfree-list-macros
 
+[![Build Status](https://github.com/mtekllc/lockfreelist/actions/workflows/ci.yml/badge.svg)](https://github.com/mtekllc/lockfreelist/actions)
+
 A macro-based C framework for building and managing lock-free singly-linked lists using C11 atomics and Compare-And-Swap (CAS) operations.
 
 This implementation provides non-blocking, thread-safe primitives for insertion, logical removal, traversal, memory reclamation, counting, and node removal — designed for high-throughput concurrent systems where fine-grained memory control is preferred over coarse-grained locks.
