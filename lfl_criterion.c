@@ -604,3 +604,27 @@ Test(lfl_dualstage, compound_insert_head_and_tail_with_ptr)
         lfl_delete(test, queue, last);
         lfl_clear(test, queue);
 }
+
+Test(lfl_count_macro, counts_non_removed_nodes_correctly)
+{
+        lfl_vars(test, queue);
+        lfl_init(test, queue);
+
+        lfl_add_tail(test, queue, n1);
+        n1->id = 1;
+        lfl_add_tail(test, queue, n2);
+        n2->id = 2;
+        lfl_add_tail(test, queue, n3);
+        n3->id = 3;
+
+        int count = 0;
+        lfl_count(test, queue, count);
+        cr_expect_eq(count, 3, "expected 3 nodes, got %d", count);
+
+        lfl_remove(test, queue, n2);
+
+        lfl_count(test, queue, count);
+        cr_expect_eq(count, 2, "expected 2 non-removed nodes after one removal, got %d", count);
+
+        lfl_clear(test, queue);
+}

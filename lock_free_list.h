@@ -394,6 +394,23 @@
         } while (0)
 
 /**
+ * @brief count the number of non-removed nodes in the list
+ *
+ * @param name list type name
+ * @param inst list instance name
+ * @param out  integer variable to store the node count
+ *
+ * @note only nodes that are not logically removed are counted
+ */
+#define lfl_count(name, inst, out) \
+        do { \
+                out = 0; \
+                lfl_foreach(name, inst, _item) { \
+                        out++; \
+                } \
+        } while (0)
+
+/**
  * @brief count nodes that are logically removed but still held by references
  *
  * @param name list type name

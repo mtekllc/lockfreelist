@@ -2,110 +2,184 @@
 
 A macro-based C framework for building and managing lock-free singly-linked lists using C11 atomics and Compare-And-Swap (CAS) operations.
 
-This implementation provides non-blocking, thread-safe primitives for insertion, logical removal, traversal, reference counting, memory reclamation, and safe iteration in concurrent environments. It is designed for performance-critical systems where fine-grained control is preferred over global locking.
+This implementation provides non-blocking, thread-safe primitives for insertion, logical removal, traversal, memory reclamation, counting, and node removal — designed for high-throughput concurrent systems where fine-grained memory control is preferred over coarse-grained locks.
+
+---
 
 ## Features
 
 - **CAS-based head/tail insertions** using `lfl_add_head()` and `lfl_add_tail()`
-- **Logical removal** via `lfl_remove()` with deferred cleanup based on atomic reference counts
-- **Immediate removal** via `lfl_delete()` with pointer-safe traversal
-- **Safe iteration** with `lfl_foreach()` that stashes `next` to support in-loop deletion
-- **Reference-based deferred sweeping** with `lfl_sweep()`
-- **Queue state analysis** using `lfl_count_pending_cleanup()`
-- **List initialization and shutdown** via `lfl_init()` and `lfl_clear()`
+- **Dual-stage insertion** with `lfl_add_head_ptr()` and `lfl_add_tail_ptr()` (caller-allocated nodes)
+- **Logical removal** via `lfl_remove()` without immediate memory reclamation
+- **Immediate deletion** via `lfl_delete()` when safe
+- **Safe traversal** with `lfl_foreach()` supporting in-loop deletion
+- **Node searching** with `lfl_find()`
+- **Deferred sweeping** using `lfl_sweep()` based on reference counts
+- **Queue state analysis** with `lfl_count()` and `lfl_count_pending_cleanup()`
+- **List initialization and shutdown** with `lfl_init()` and `lfl_clear()`
+- **Atomic node popping** from head or tail with `lfl_pop_head()` and `lfl_pop_tail()`
+
+---
 
 ## Macro Descriptions
 
 ### `lfl_def(name)` / `lfl_end`
-Defines a new lock-free list node type. Insert your user fields between the two macros.
+Defines a new lock-free list node type. User fields go between `lfl_def` and `lfl_end`.
+
+Example:
+```c
+lfl_def(mytype)
+    int id;
+lfl_end
+```
+
+---
 
 ### `lfl_vars(name, inst)`
-Declares `head` and `tail` pointers for a named list instance.
+Declares atomic head and tail pointers for a list instance.
+
+Example:
+```c
+lfl_vars(mytype, myqueue);
+```
+
+---
 
 ### `lfl_init(name, inst)`
-Initializes the list instance by setting head and tail to `NULL`.
+Initializes a list's head and tail to `NULL`.
+
+---
+
+### `lfl_type(name)`
+Expands to `struct name##_linked_list`, the type of list nodes.
+
+---
+
+### `lfl_get_head(inst)` / `lfl_get_tail(inst)`
+Atomically loads the head or tail of a list.
+
+---
+
+### `lfl_get_next(cursor)`
+Atomically loads the next pointer of a node.
+
+---
+
+### `lfl_foreach(name, inst, item)`
+Safely iterates over **non-removed** nodes in the list.
+
+- Internally caches the `next` pointer before visiting the current node
+- Allows `lfl_remove()` and `lfl_delete()` to be called safely inside the loop
+
+Example:
+```c
+lfl_foreach(mytype, myqueue, node) {
+    printf("Node id = %d\n", node->id);
+}
+```
+
+---
 
 ### `lfl_add_head(name, inst, item)` / `lfl_add_tail(name, inst, item)`
-Appends a node to the head or tail of the list. The macro allocates and initializes the node.
+Single-stage add macros:
+- **Allocates** a new node internally
+- **Immediately publishes** to the list
 
-### Dual-stage insertion: `_ptr` variants
-In addition to the single-stage `lfl_add_head()` and `lfl_add_tail()` macros,
-this library provides two-stage insertion macros:
+---
+
+### Dual-Stage Insertion: `_ptr` variants
 
 - `lfl_add_head_ptr(name, inst, ptr)`
 - `lfl_add_tail_ptr(name, inst, ptr)`
 
-These variants **do not allocate memory internally**. Instead, they operate on
-pointers to pre-allocated and fully initialized nodes provided by the caller.
+These variants **do not allocate memory internally**.
+The caller **allocates and fully initializes** the node before publishing it to the list.
 
-This allows the caller to initialize application-level data **before** the node
-becomes visible to other threads, avoiding the race condition where readers
-might observe a partially populated structure.
-
-For convenience, the macro `lfl_new(name)` is available to allocate and zero-initialize
-a new node of the appropriate type.
+This avoids readers ever seeing partially populated structures.
 
 Example:
-
 ```c
 test_t *node = lfl_new(test);
 node->id = 123;
-lfl_add_tail_ptr(mytype, myqueue, node);
+lfl_add_tail_ptr(test, myqueue, node);
 ```
 
+Helper macro `lfl_new(name)` simplifies allocation.
+
+---
+
 ### `lfl_remove(name, inst, target)`
-Marks a node as logically removed by setting its `removed` flag. Intended for use with `lfl_sweep()`.
+Marks a node as logically removed (but keeps it in the list until swept or deleted).
+
+---
 
 ### `lfl_delete(name, inst, ptr)`
-Immediately unlinks and frees a node from the list. Safe for in-loop deletion using `lfl_foreach()`.
+Unlinks and frees a node immediately.
+Safe for calling inside a `lfl_foreach()` loop.
 
-### `lfl_foreach(name, inst, item)`
-Iterates over all non-removed nodes. Internally caches the `next` pointer before each iteration, allowing safe `lfl_delete()` calls from within the loop.
+---
 
 ### `lfl_find(name, inst, item, field, value)`
-Searches for a node with a field matching the given value. Skips removed nodes.
+Finds the first node matching a specified field value, skipping logically removed nodes.
+
+---
 
 ### `lfl_sweep(name, inst, ref, [cleanup])`
-Traverses the list and permanently frees nodes that are both logically removed and have `refcount == 0`. Optionally calls a cleanup function before freeing.
+Traverses the list and frees logically removed nodes whose `refcount` is zero.
+
+Optional: calls a cleanup function before freeing nodes.
+
+---
 
 ### `lfl_clear(name, inst)`
-Frees all nodes in the list unconditionally, typically used for shutdown.
+Unconditionally frees all nodes and resets the list to empty.
+
+---
+
+### `lfl_count(name, inst, out)`
+Counts the number of nodes that are **not logically removed**.
+
+Example:
+```c
+int live_nodes = 0;
+lfl_count(mytype, myqueue, live_nodes);
+printf("Live nodes: %d\n", live_nodes);
+```
+
+---
 
 ### `lfl_count_pending_cleanup(name, inst, ref, out)`
-Counts nodes that are logically removed but still have a non-zero reference count.
+Counts nodes that are logically removed but still held by outstanding references (refcount > 0).
 
-### `lfl_pop_head(name, inst, item)`
-Atomically removes the head of the list and assigns the result to `item`.
-The node is logically removed but **not freed**. Caller is responsible for
-processing and eventually calling `lfl_delete()` or allowing it to be swept.
+---
 
-### `lfl_pop_tail(name, inst, item)`
-Traverses and removes the last node in the list, assigning it to `item`.
-The node is unlinked and logically removed but **not freed**.
+### `lfl_pop_head(name, inst, item)` / `lfl_pop_tail(name, inst, item)`
+Atomically removes a node from the head or tail of the list.
 
-Both macros return `NULL` (via `item`) if the list is empty.
+- Node is logically removed but **not freed**
+- Caller should eventually free it or allow sweep
 
-Example usage:
-
+Example:
 ```c
 lfl_pop_head(mytype, myqueue, node);
 if (node) {
-    // use node, delete when done
+    // process node
     lfl_delete(mytype, myqueue, node);
 }
 ```
 
 ---
 
-
 ## Example Use Case
 
-A test program is provided that:
-- Spawns a producer thread injecting new work at high throughput
-- Spawns a monitor thread reporting live queue size
-- Spawns a cleaner thread that deletes or sweeps old work
+A sample test program can:
+- Spawn a producer thread adding new work
+- Spawn a monitor thread scanning and counting live nodes
+- Spawn a cleaner thread removing or sweeping nodes
 
-Press `Ctrl+C` to stop the producer and drain the queue safely.
+Press `Ctrl+C` to stop the producer and cleanly drain the list.
+
+---
 
 ## License
 
@@ -113,5 +187,4 @@ MIT License — see [LICENSE](./LICENSE) for full terms.
 
 ---
 
-© 2024 Michael Miller
-
+© 2025 Michael Miller
