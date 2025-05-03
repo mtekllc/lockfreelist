@@ -115,7 +115,7 @@
 #define lfl_get_head(inst) atomic_load_explicit(&inst##_head, memory_order_acquire);
 
 /* get the tail */
-#define lfl_get_tail(inst) atomic_load_explicit(&inst##_tail, memory_order_acquire);        
+#define lfl_get_tail(inst) atomic_load_explicit(&inst##_tail, memory_order_acquire);
 
 /* get the next */
 #define lfl_get_next(_cursor) atomic_load_explicit(&_cursor->next, memory_order_acquire);
@@ -296,28 +296,34 @@
         } while (0)
 
 /**
- * @brief immediately remove node from list and free
+ * @brief atomically remove node from list and free
  *
- * @param name list type name
- * @param inst list instance name
- * @param ptr pointer to node to delete
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param ptr   pointer to node to delete
  */
+
 #define lfl_delete(name, inst, ptr) \
         do { \
                 struct name##_linked_list *prev = atomic_load_explicit(&(ptr->prev), memory_order_acquire); \
                 struct name##_linked_list *next = atomic_load_explicit(&(ptr->next), memory_order_acquire); \
                 if (prev) { \
-                        atomic_store_explicit(&(prev->next), next, memory_order_release); \
+                        struct name##_linked_list *expected = ptr; \
+                        atomic_compare_exchange_weak_explicit(&(prev->next), &expected, next, memory_order_acq_rel, memory_order_acquire); \
                 } else { \
-                        atomic_store_explicit(&(inst##_head), next, memory_order_release); \
+                        struct name##_linked_list *expected = ptr; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_head), &expected, next, memory_order_acq_rel, memory_order_acquire); \
                 } \
                 if (next) { \
-                        atomic_store_explicit(&(next->prev), prev, memory_order_release); \
+                        struct name##_linked_list *expected = ptr; \
+                        atomic_compare_exchange_weak_explicit(&(next->prev), &expected, prev, memory_order_acq_rel, memory_order_acquire); \
                 } else { \
-                        atomic_store_explicit(&(inst##_tail), prev, memory_order_release); \
+                        struct name##_linked_list *expected = ptr; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_tail), &expected, prev, memory_order_acq_rel, memory_order_acquire); \
                 } \
                 free(ptr); \
         } while (0)
+
 /**
  * @brief lock-free search through the list using a condition
  *
@@ -342,14 +348,15 @@
         } while (0)
 
 /**
- * @brief sweep logically removed nodes with refcount == 0,
- *        and optionally call a cleanup function before free
+ * @brief atomically sweep logically removed nodes with refcount == 0,
+ *        and optionally call a cleanup function before freeing
  *
  * @param name     list type name
  * @param inst     instance name
  * @param ref      field name of atomic refcount in the node
  * @param cleanup  pointer to cleanup function or NULL
  */
+
 #define lfl_sweep(name, inst, ref, ...) \
         do { \
                 struct name##_linked_list *prev = NULL; \
@@ -358,16 +365,35 @@
                 if (sizeof((void *[]){__VA_ARGS__}) / sizeof(void *) > 0) \
                         cleanup_fn = __VA_ARGS__; \
                 while (curr) { \
-                        struct name##_linked_list *next = atomic_load_explicit(&curr->next, memory_order_acquire); \
-                        int removed = atomic_load_explicit(&curr->removed, memory_order_acquire); \
-                        int refs = atomic_load_explicit(&curr->ref, memory_order_acquire); \
+                        struct name##_linked_list *next = atomic_load_explicit(&(curr->next), memory_order_acquire); \
+                        int removed = atomic_load_explicit(&(curr->removed), memory_order_acquire); \
+                        int refs = atomic_load_explicit(&(curr->ref), memory_order_acquire); \
                         if (removed && refs == 0) { \
-                                if (prev) atomic_store_explicit(&prev->next, next, memory_order_release); \
-                                else atomic_store_explicit(&(inst##_head), next, memory_order_release); \
-                                if (cleanup_fn) cleanup_fn(curr); \
-                                free(curr); \
-                                curr = next; \
-                                continue; \
+                                if (prev) { \
+                                        struct name##_linked_list *expected = curr; \
+                                        if (atomic_compare_exchange_weak_explicit(&(prev->next), &expected, next, memory_order_acq_rel, memory_order_acquire)) { \
+                                                if (cleanup_fn) cleanup_fn(curr); \
+                                                free(curr); \
+                                                curr = next; \
+                                                continue; \
+                                        } else { \
+                                                prev = NULL; \
+                                                curr = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                                                continue; \
+                                        } \
+                                } else { \
+                                        struct name##_linked_list *expected = curr; \
+                                        if (atomic_compare_exchange_weak_explicit(&(inst##_head), &expected, next, memory_order_acq_rel, memory_order_acquire)) { \
+                                                if (cleanup_fn) cleanup_fn(curr); \
+                                                free(curr); \
+                                                curr = next; \
+                                                continue; \
+                                        } else { \
+                                                prev = NULL; \
+                                                curr = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                                                continue; \
+                                        } \
+                                } \
                         } \
                         prev = curr; \
                         curr = next; \
@@ -435,55 +461,69 @@
 
 
 /**
- * @brief atomically remove and return the head node of the list
+ * @brief atomically remove and return the first node in the list
  *
  * @param name  list type name
  * @param inst  list instance name
  * @param item  local variable to receive the head node pointer
  *
- * @return the head node is logically removed and assigned to `item`; it is not freed
+ * @return the first node is unlinked but not freed; caller may inspect it
  */
 
 #define lfl_pop_head(name, inst, item) \
-        struct name##_linked_list *item = NULL; \
         do { \
-                item = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
-                if (!item) break; \
-                struct name##_linked_list *next = atomic_load_explicit(&item->next, memory_order_acquire); \
-                if (atomic_compare_exchange_weak_explicit(&(inst##_head), &item, next, \
-                    memory_order_release, memory_order_relaxed)) { \
-                        lfl_remove(name, inst, item); \
-                        break; \
+                struct name##_linked_list *cursor = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                while (cursor) { \
+                        struct name##_linked_list *next = atomic_load_explicit(&(cursor->next), memory_order_acquire); \
+                        if (atomic_compare_exchange_weak_explicit(&(inst##_head), &cursor, next, memory_order_acq_rel, memory_order_acquire)) { \
+                                item = cursor; \
+                                if (!next) atomic_store_explicit(&(inst##_tail), (struct name##_linked_list *)NULL, memory_order_release); \
+                                atomic_store_explicit(&(item->next), (struct name##_linked_list *)NULL, memory_order_release); \
+                                atomic_store_explicit(&(item->prev), (struct name##_linked_list *)NULL, memory_order_release); \
+                                break; \
+                        } \
                 } \
         } while (0)
 
 /**
- * @brief remove and return the last node in the list
+ * @brief atomically remove and return the last node in the list
  *
  * @param name  list type name
  * @param inst  list instance name
  * @param item  local variable to receive the tail node pointer
  *
- * @return the last node is unlinked and logically removed, but not freed; caller may inspect it
+ * @return the last node is unlinked but not freed; caller may inspect it
  */
 
 #define lfl_pop_tail(name, inst, item) \
-        struct name##_linked_list *item = NULL; \
         do { \
-                struct name##_linked_list *prev = NULL; \
-                struct name##_linked_list *curr = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
-                while (curr) { \
-                        struct name##_linked_list *next = atomic_load_explicit(&curr->next, memory_order_acquire); \
-                        if (!next) { \
-                                item = curr; \
-                                break; \
+                struct name##_linked_list *cursor_tail = atomic_load_explicit(&(inst##_tail), memory_order_acquire); \
+                while (cursor_tail) { \
+                        struct name##_linked_list *prev = NULL; \
+                        struct name##_linked_list *curr = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                        while (curr && curr != cursor_tail) { \
+                                prev = curr; \
+                                curr = atomic_load_explicit(&(curr->next), memory_order_acquire); \
                         } \
-                        prev = curr; \
-                        curr = next; \
+                        if (!curr) break; /* item disappeared */ \
+                        if (prev) { \
+                                if (atomic_compare_exchange_weak_explicit(&(inst##_tail), &cursor_tail, prev, memory_order_acq_rel, memory_order_acquire)) { \
+                                        atomic_store_explicit(&(prev->next), (struct name##_linked_list *)NULL, memory_order_release); \
+                                        item = curr; \
+                                        atomic_store_explicit(&(item->next), (struct name##_linked_list *)NULL, memory_order_release); \
+                                        atomic_store_explicit(&(item->prev), (struct name##_linked_list *)NULL, memory_order_release); \
+                                        break; \
+                                } \
+                        } else { \
+                                if (atomic_compare_exchange_weak_explicit(&(inst##_head), &cursor_tail, (struct name##_linked_list *)NULL, memory_order_acq_rel, memory_order_acquire)) { \
+                                        atomic_store_explicit(&(inst##_tail), (struct name##_linked_list *)NULL, memory_order_release); \
+                                        item = curr; \
+                                        atomic_store_explicit(&(item->next), (struct name##_linked_list *)NULL, memory_order_release); \
+                                        atomic_store_explicit(&(item->prev), (struct name##_linked_list *)NULL, memory_order_release); \
+                                        break; \
+                                } \
+                        } \
+                        cursor_tail = atomic_load_explicit(&(inst##_tail), memory_order_acquire); \
                 } \
-                if (!item) break; \
-                if (prev) atomic_store_explicit(&prev->next, NULL, memory_order_release); \
-                else atomic_store_explicit(&(inst##_head), NULL, memory_order_release); \
-                lfl_remove(name, inst, item); \
         } while (0)
 

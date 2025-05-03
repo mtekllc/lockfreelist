@@ -428,6 +428,8 @@ Test(lfl_lockfree, foreach_mixed_remove_delete_then_sweep)
 
 Test(lfl_pop, pop_head_returns_first_node)
 {
+        test_t *head = NULL;
+
         lfl_vars(test, queue);
         lfl_init(test, queue);
 
@@ -437,8 +439,8 @@ Test(lfl_pop, pop_head_returns_first_node)
         n2->id = 200;
 
         lfl_pop_head(test, queue, head);
-        cr_assert_not_null(head, "Expected a node to be popped from head");
-        cr_expect_eq(head->id, 100, "Expected head node to have id 100, got %d", head->id);
+        cr_assert_not_null(head, "expected a node to be popped from head");
+        cr_expect_eq(head->id, 100, "expected head node to have id 100, got %d", head->id);
 
         lfl_delete(test, queue, head);
         lfl_clear(test, queue);
@@ -446,6 +448,8 @@ Test(lfl_pop, pop_head_returns_first_node)
 
 Test(lfl_pop, pop_tail_returns_last_node)
 {
+        test_t *tail = NULL;
+
         lfl_vars(test, queue);
         lfl_init(test, queue);
 
@@ -457,8 +461,8 @@ Test(lfl_pop, pop_tail_returns_last_node)
         n3->id = 3;
 
         lfl_pop_tail(test, queue, tail);
-        cr_assert_not_null(tail, "Expected a node to be popped from tail");
-        cr_expect_eq(tail->id, 3, "Expected tail node to have id 3, got %d", tail->id);
+        cr_assert_not_null(tail, "expected a node to be popped from tail");
+        cr_expect_eq(tail->id, 3, "expected tail node to have id 3, got %d", tail->id);
 
         lfl_delete(test, queue, tail);
         lfl_clear(test, queue);
@@ -466,24 +470,124 @@ Test(lfl_pop, pop_tail_returns_last_node)
 
 Test(lfl_pop, pop_head_from_empty_returns_null)
 {
+        test_t *head = NULL;
+
         lfl_vars(test, queue);
         lfl_init(test, queue);
 
         lfl_pop_head(test, queue, head);
-        cr_expect_null(head, "Expected NULL when popping head from an empty list");
+        cr_expect_null(head, "expected NULL when popping head from an empty list");
 
         lfl_clear(test, queue);
 }
 
 Test(lfl_pop, pop_tail_from_empty_returns_null)
 {
+        test_t *tail = NULL;
+
         lfl_vars(test, queue);
         lfl_init(test, queue);
 
         lfl_pop_tail(test, queue, tail);
-        cr_expect_null(tail, "Expected NULL when popping tail from an empty list");
+        cr_expect_null(tail, "expected NULL when popping tail from an empty list");
 
         lfl_clear(test, queue);
+}
+
+Test(lfl_pop_operations, pop_head_unlinks_correctly)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        /* add three nodes */
+        test_t *n1 = lfl_new(test);
+        n1->id = 1;
+        lfl_add_tail_ptr(test, mylist, n1);
+
+        test_t *n2 = lfl_new(test);
+        n2->id = 2;
+        lfl_add_tail_ptr(test, mylist, n2);
+
+        test_t *n3 = lfl_new(test);
+        n3->id = 3;
+        lfl_add_tail_ptr(test, mylist, n3);
+
+        /* pop head nodes */
+        test_t *popped1 = NULL;
+        lfl_pop_head(test, mylist, popped1);
+        cr_assert_not_null(popped1);
+        cr_assert_eq(popped1->id, 1);
+        cr_assert_null(popped1->next);
+        cr_assert_null(popped1->prev);
+        free(popped1);
+
+        test_t *popped2 = NULL;
+        lfl_pop_head(test, mylist, popped2);
+        cr_assert_not_null(popped2);
+        cr_assert_eq(popped2->id, 2);
+        cr_assert_null(popped2->next);
+        cr_assert_null(popped2->prev);
+        free(popped2);
+
+        test_t *popped3 = NULL;
+        lfl_pop_head(test, mylist, popped3);
+        cr_assert_not_null(popped3);
+        cr_assert_eq(popped3->id, 3);
+        cr_assert_null(popped3->next);
+        cr_assert_null(popped3->prev);
+        free(popped3);
+
+        /* list should now be empty */
+        cr_assert_null(atomic_load_explicit(&mylist_head, memory_order_acquire));
+        cr_assert_null(atomic_load_explicit(&mylist_tail, memory_order_acquire));
+}
+
+Test(lfl_pop_operations, pop_tail_unlinks_correctly)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        /* add three nodes */
+        test_t *n1 = lfl_new(test);
+        n1->id = 10;
+        lfl_add_tail_ptr(test, mylist, n1);
+
+        test_t *n2 = lfl_new(test);
+        n2->id = 20;
+        lfl_add_tail_ptr(test, mylist, n2);
+
+        test_t *n3 = lfl_new(test);
+        n3->id = 30;
+        lfl_add_tail_ptr(test, mylist, n3);
+
+        /* pop tail nodes */
+        test_t *popped1 = NULL;
+        lfl_pop_tail(test, mylist, popped1);
+        cr_assert_not_null(popped1);
+        cr_assert_eq(popped1->id, 30);
+        cr_assert_null(popped1->next);
+        cr_assert_null(popped1->prev);
+        free(popped1);
+
+        test_t *popped2 = NULL;
+        lfl_pop_tail(test, mylist, popped2);
+        cr_assert_not_null(popped2);
+        cr_assert_eq(popped2->id, 20);
+        cr_assert_null(popped2->next);
+        cr_assert_null(popped2->prev);
+        free(popped2);
+
+        test_t *popped3 = NULL;
+        lfl_pop_tail(test, mylist, popped3);
+        cr_assert_not_null(popped3);
+        cr_assert_eq(popped3->id, 10);
+        cr_assert_null(popped3->next);
+        cr_assert_null(popped3->prev);
+        free(popped3);
+
+        /* list should now be empty */
+        cr_assert_null(atomic_load_explicit(&mylist_head, memory_order_acquire));
+        cr_assert_null(atomic_load_explicit(&mylist_tail, memory_order_acquire));
 }
 
 struct container {
@@ -500,7 +604,7 @@ Test(lfl_vars, vars_can_be_embedded_in_struct)
         n1->id = 42;
 
         lfl_foreach(test, c.innerlist, item) {
-                cr_expect_eq(item->id, 42, "Expected embedded list node with id 42, got %d", item->id);
+                cr_expect_eq(item->id, 42, "expected embedded list node with id 42, got %d", item->id);
         }
 
         lfl_clear(test, c.innerlist);
@@ -525,11 +629,11 @@ Test(lfl_integrity, add_delete_add_sequence)
         // check if new node is correctly added
         int count = 0;
         lfl_foreach(test, queue, item) {
-                cr_expect_eq(item->id, 2, "Expected new node with id 2 after delete, got %d", item->id);
+                cr_expect_eq(item->id, 2, "expected new node with id 2 after delete, got %d", item->id);
                 count++;
         }
 
-        cr_expect_eq(count, 1, "Expected exactly one node after add-delete-add sequence, got %d", count);
+        cr_expect_eq(count, 1, "expected exactly one node after add-delete-add sequence, got %d", count);
 
         lfl_clear(test, queue);
 }
@@ -627,4 +731,156 @@ Test(lfl_count_macro, counts_non_removed_nodes_correctly)
         cr_expect_eq(count, 2, "expected 2 non-removed nodes after one removal, got %d", count);
 
         lfl_clear(test, queue);
+}
+
+Test(lfl_delete_operation, delete_middle_node_correctly)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        /* add three nodes */
+        test_t *n1 = lfl_new(test);
+        n1->id = 1;
+        lfl_add_tail_ptr(test, mylist, n1);
+
+        test_t *n2 = lfl_new(test);
+        n2->id = 2;
+        lfl_add_tail_ptr(test, mylist, n2);
+
+        test_t *n3 = lfl_new(test);
+        n3->id = 3;
+        lfl_add_tail_ptr(test, mylist, n3);
+
+        /* delete the middle node */
+        lfl_delete(test, mylist, n2);
+
+        /* verify list integrity */
+        struct test_linked_list *head = atomic_load_explicit(&mylist_head, memory_order_acquire);
+        cr_assert_not_null(head);
+        cr_assert_eq(head->id, 1);
+
+        struct test_linked_list *next = atomic_load_explicit(&head->next, memory_order_acquire);
+        cr_assert_not_null(next);
+        cr_assert_eq(next->id, 3);
+
+        cr_assert_null(atomic_load_explicit(&next->next, memory_order_acquire));
+
+        /* verify tail is still correct */
+        struct test_linked_list *tail = atomic_load_explicit(&mylist_tail, memory_order_acquire);
+        cr_assert_not_null(tail);
+        cr_assert_eq(tail->id, 3);
+
+        /* clean up */
+        test_t *popped1 = NULL;
+
+        lfl_pop_head(test, mylist, popped1);
+        cr_assert_not_null(popped1);
+        free(popped1);
+
+        test_t *popped2 = NULL;
+
+        lfl_pop_head(test, mylist, popped2);
+        cr_assert_not_null(popped2);
+        free(popped2);
+}
+
+Test(lfl_delete_operation, delete_head_node_correctly)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        /* add three nodes */
+        test_t *n1 = lfl_new(test);
+        n1->id = 100;
+        lfl_add_tail_ptr(test, mylist, n1);
+
+        test_t *n2 = lfl_new(test);
+        n2->id = 200;
+        lfl_add_tail_ptr(test, mylist, n2);
+
+        test_t *n3 = lfl_new(test);
+        n3->id = 300;
+        lfl_add_tail_ptr(test, mylist, n3);
+
+        /* delete the head node */
+        lfl_delete(test, mylist, n1);
+
+        /* verify new head is n2 */
+        struct test_linked_list *head = atomic_load_explicit(&mylist_head, memory_order_acquire);
+        cr_assert_not_null(head);
+        cr_assert_eq(head->id, 200);
+
+        /* verify head next points to n3 */
+        struct test_linked_list *next = atomic_load_explicit(&head->next, memory_order_acquire);
+        cr_assert_not_null(next);
+        cr_assert_eq(next->id, 300);
+
+        /* verify tail still points to n3 */
+        struct test_linked_list *tail = atomic_load_explicit(&mylist_tail, memory_order_acquire);
+        cr_assert_not_null(tail);
+        cr_assert_eq(tail->id, 300);
+
+        /* clean up remaining nodes */
+        test_t *popped1 = NULL;
+
+        lfl_pop_head(test, mylist, popped1);
+        cr_assert_not_null(popped1);
+        free(popped1);
+
+        test_t *popped2 = NULL;
+
+        lfl_pop_head(test, mylist, popped2);
+        cr_assert_not_null(popped2);
+        free(popped2);
+}
+
+Test(lfl_delete_operation, delete_tail_node_correctly)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        /* add three nodes */
+        test_t *n1 = lfl_new(test);
+        n1->id = 1000;
+        lfl_add_tail_ptr(test, mylist, n1);
+
+        test_t *n2 = lfl_new(test);
+        n2->id = 2000;
+        lfl_add_tail_ptr(test, mylist, n2);
+
+        test_t *n3 = lfl_new(test);
+        n3->id = 3000;
+        lfl_add_tail_ptr(test, mylist, n3);
+
+        /* delete the tail node */
+        lfl_delete(test, mylist, n3);
+
+        /* verify new tail is now n2 */
+        struct test_linked_list *tail = atomic_load_explicit(&mylist_tail, memory_order_acquire);
+        cr_assert_not_null(tail);
+        cr_assert_eq(tail->id, 2000);
+
+        /* verify head still points to n1 */
+        struct test_linked_list *head = atomic_load_explicit(&mylist_head, memory_order_acquire);
+        cr_assert_not_null(head);
+        cr_assert_eq(head->id, 1000);
+
+        /* verify the list links correctly: n1 -> n2 -> null */
+        struct test_linked_list *next = atomic_load_explicit(&head->next, memory_order_acquire);
+        cr_assert_not_null(next);
+        cr_assert_eq(next->id, 2000);
+        cr_assert_null(atomic_load_explicit(&next->next, memory_order_acquire));
+
+        /* clean up */
+        test_t *popped1 = NULL;
+
+        lfl_pop_head(test, mylist, popped1);
+        cr_assert_not_null(popped1);
+        free(popped1);
+
+        test_t *popped2 = NULL;
+
+        lfl_pop_head(test, mylist, popped2);
+        cr_assert_not_null(popped2);
+        free(popped2);
 }
