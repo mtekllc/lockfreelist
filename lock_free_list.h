@@ -112,13 +112,13 @@
 /* for discrete operations */
 
 /* get the head */
-#define lfl_get_head(inst) atomic_load_explicit(&inst##_head, memory_order_acquire);
+#define lfl_get_head(inst) atomic_load_explicit(&inst##_head, memory_order_acquire)
 
 /* get the tail */
-#define lfl_get_tail(inst) atomic_load_explicit(&inst##_tail, memory_order_acquire);
+#define lfl_get_tail(inst) atomic_load_explicit(&inst##_tail, memory_order_acquire)
 
 /* get the next */
-#define lfl_get_next(_cursor) atomic_load_explicit(&_cursor->next, memory_order_acquire);
+#define lfl_get_next(_cursor) atomic_load_explicit(&_cursor->next, memory_order_acquire)
 
 /**
  * @brief initialize list instance pointers to NULL
