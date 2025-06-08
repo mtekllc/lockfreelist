@@ -170,6 +170,34 @@ if (node) {
 }
 ```
 
+### Moving and sorting nodes
+
+`lfl_move_before(name, inst, A, B)` moves `B` so it appears directly before `A`.
+`lfl_move_after(name, inst, A, B)` moves `B` directly after `A`.
+
+`lfl_sort_asc(name, inst, field)` sorts the list in ascending order based on `field`. `lfl_sort_desc(name, inst, field)` performs the opposite sort.
+
+```c
+lfl_def(test, {
+        int id;
+});
+lfl_end(test);
+
+lfl_vars(test, q);
+lfl_init(test, q);
+
+lfl_add_tail(test, q, n1); n1->id = 3;
+lfl_add_tail(test, q, n2); n2->id = 1;
+lfl_add_tail(test, q, n3); n3->id = 2;
+
+lfl_move_before(test, q, n1, n3); /* list is n3, n1, n2 */
+lfl_move_after(test, q, n1, n2);  /* list is n3, n2, n1 */
+
+lfl_sort_asc(test, q, id);  /* list becomes 1, 2, 3 */
+lfl_sort_desc(test, q, id); /* list becomes 3, 2, 1 */
+
+```
+
 ---
 
 ## Example Use Case

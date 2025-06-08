@@ -884,3 +884,103 @@ Test(lfl_delete_operation, delete_tail_node_correctly)
         cr_assert_not_null(popped2);
         free(popped2);
 }
+
+Test(lfl_move, move_before_places_node_at_head)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        lfl_add_tail(test, mylist, n1);
+        n1->id = 1;
+        lfl_add_tail(test, mylist, n2);
+        n2->id = 2;
+        lfl_add_tail(test, mylist, n3);
+        n3->id = 3;
+
+        lfl_move_before(test, mylist, n1, n3);
+
+        int expected[] = {3, 1, 2};
+        int idx = 0;
+        lfl_foreach(test, mylist, item) {
+                cr_expect_eq(item->id, expected[idx], "order mismatch");
+                idx++;
+        }
+        cr_expect_eq(idx, 3);
+
+        lfl_clear(test, mylist);
+}
+
+Test(lfl_move, move_after_places_node_at_tail)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        lfl_add_tail(test, mylist, n1);
+        n1->id = 1;
+        lfl_add_tail(test, mylist, n2);
+        n2->id = 2;
+        lfl_add_tail(test, mylist, n3);
+        n3->id = 3;
+
+        lfl_move_after(test, mylist, n3, n1);
+
+        int expected[] = {2, 3, 1};
+        int idx = 0;
+        lfl_foreach(test, mylist, item) {
+                cr_expect_eq(item->id, expected[idx], "order mismatch");
+                idx++;
+        }
+        cr_expect_eq(idx, 3);
+
+        lfl_clear(test, mylist);
+}
+
+Test(lfl_sort, sort_ascending)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        lfl_add_tail(test, mylist, a);
+        a->id = 3;
+        lfl_add_tail(test, mylist, b);
+        b->id = 1;
+        lfl_add_tail(test, mylist, c);
+        c->id = 2;
+
+        lfl_sort_asc(test, mylist, id);
+
+        int expected[] = {1, 2, 3};
+        int idx = 0;
+        lfl_foreach(test, mylist, item) {
+                cr_expect_eq(item->id, expected[idx], "asc sort mismatch");
+                idx++;
+        }
+        cr_expect_eq(idx, 3);
+
+        lfl_clear(test, mylist);
+}
+
+Test(lfl_sort, sort_descending)
+{
+        lfl_vars(test, mylist);
+        lfl_init(test, mylist);
+
+        lfl_add_tail(test, mylist, a);
+        a->id = 1;
+        lfl_add_tail(test, mylist, b);
+        b->id = 3;
+        lfl_add_tail(test, mylist, c);
+        c->id = 2;
+
+        lfl_sort_desc(test, mylist, id);
+
+        int expected[] = {3, 2, 1};
+        int idx = 0;
+        lfl_foreach(test, mylist, item) {
+                cr_expect_eq(item->id, expected[idx], "desc sort mismatch");
+                idx++;
+        }
+        cr_expect_eq(idx, 3);
+
+        lfl_clear(test, mylist);
+}

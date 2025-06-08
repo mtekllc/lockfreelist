@@ -527,3 +527,135 @@
                 } \
         } while (0)
 
+
+/**
+ * @brief move nodeB directly before nodeA within the list
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param nodeA reference node already in the list
+ * @param nodeB node to relocate before nodeA
+ */
+#define lfl_move_before(name, inst, nodeA, nodeB) \
+        do { \
+                struct name##_linked_list *prev_b = atomic_load_explicit(&(nodeB->prev), memory_order_acquire); \
+                struct name##_linked_list *next_b = atomic_load_explicit(&(nodeB->next), memory_order_acquire); \
+                if (prev_b) { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(prev_b->next), &exp, next_b, memory_order_acq_rel, memory_order_acquire); \
+                } else { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_head), &exp, next_b, memory_order_acq_rel, memory_order_acquire); \
+                } \
+                if (next_b) { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(next_b->prev), &exp, prev_b, memory_order_acq_rel, memory_order_acquire); \
+                } else { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_tail), &exp, prev_b, memory_order_acq_rel, memory_order_acquire); \
+                } \
+                struct name##_linked_list *prev_a = atomic_load_explicit(&(nodeA->prev), memory_order_acquire); \
+                do { \
+                        prev_a = atomic_load_explicit(&(nodeA->prev), memory_order_acquire); \
+                        atomic_store_explicit(&(nodeB->prev), prev_a, memory_order_relaxed); \
+                        atomic_store_explicit(&(nodeB->next), nodeA, memory_order_relaxed); \
+                } while (!atomic_compare_exchange_weak_explicit(&(nodeA->prev), &prev_a, nodeB, memory_order_acq_rel, memory_order_acquire)); \
+                if (prev_a) { \
+                        struct name##_linked_list *exp = nodeA; \
+                        atomic_compare_exchange_weak_explicit(&(prev_a->next), &exp, nodeB, memory_order_acq_rel, memory_order_acquire); \
+                } else { \
+                        struct name##_linked_list *exp = nodeA; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_head), &exp, nodeB, memory_order_acq_rel, memory_order_acquire); \
+                } \
+        } while (0)
+
+/**
+ * @brief move nodeB directly after nodeA within the list
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param nodeA reference node already in the list
+ * @param nodeB node to relocate after nodeA
+ */
+#define lfl_move_after(name, inst, nodeA, nodeB) \
+        do { \
+                struct name##_linked_list *prev_b = atomic_load_explicit(&(nodeB->prev), memory_order_acquire); \
+                struct name##_linked_list *next_b = atomic_load_explicit(&(nodeB->next), memory_order_acquire); \
+                if (prev_b) { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(prev_b->next), &exp, next_b, memory_order_acq_rel, memory_order_acquire); \
+                } else { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_head), &exp, next_b, memory_order_acq_rel, memory_order_acquire); \
+                } \
+                if (next_b) { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(next_b->prev), &exp, prev_b, memory_order_acq_rel, memory_order_acquire); \
+                } else { \
+                        struct name##_linked_list *exp = nodeB; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_tail), &exp, prev_b, memory_order_acq_rel, memory_order_acquire); \
+                } \
+                struct name##_linked_list *next_a = atomic_load_explicit(&(nodeA->next), memory_order_acquire); \
+                do { \
+                        next_a = atomic_load_explicit(&(nodeA->next), memory_order_acquire); \
+                        atomic_store_explicit(&(nodeB->next), next_a, memory_order_relaxed); \
+                        atomic_store_explicit(&(nodeB->prev), nodeA, memory_order_relaxed); \
+                } while (!atomic_compare_exchange_weak_explicit(&(nodeA->next), &next_a, nodeB, memory_order_acq_rel, memory_order_acquire)); \
+                if (next_a) { \
+                        struct name##_linked_list *exp = nodeA; \
+                        atomic_compare_exchange_weak_explicit(&(next_a->prev), &exp, nodeB, memory_order_acq_rel, memory_order_acquire); \
+                } else { \
+                        struct name##_linked_list *exp = nodeA; \
+                        atomic_compare_exchange_weak_explicit(&(inst##_tail), &exp, nodeB, memory_order_acq_rel, memory_order_acquire); \
+                } \
+        } while (0)
+
+/**
+ * @brief sort the entire list in ascending order by a field
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param field struct field used for comparison
+ */
+#define lfl_sort_asc(name, inst, field) \
+        do { \
+                struct name##_linked_list *_outer = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                while (_outer) { \
+                        struct name##_linked_list *_min = _outer; \
+                        struct name##_linked_list *_scan = atomic_load_explicit(&(_outer->next), memory_order_acquire); \
+                        while (_scan) { \
+                                if (_scan->field < _min->field) _min = _scan; \
+                                _scan = atomic_load_explicit(&(_scan->next), memory_order_acquire); \
+                        } \
+                        if (_min != _outer) { \
+                                lfl_move_before(name, inst, _outer, _min); \
+                                _outer = _min; \
+                        } \
+                        _outer = atomic_load_explicit(&(_outer->next), memory_order_acquire); \
+                } \
+        } while (0)
+
+/**
+ * @brief sort the entire list in descending order by a field
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param field struct field used for comparison
+ */
+#define lfl_sort_desc(name, inst, field) \
+        do { \
+                struct name##_linked_list *_outer = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
+                while (_outer) { \
+                        struct name##_linked_list *_max = _outer; \
+                        struct name##_linked_list *_scan = atomic_load_explicit(&(_outer->next), memory_order_acquire); \
+                        while (_scan) { \
+                                if (_scan->field > _max->field) _max = _scan; \
+                                _scan = atomic_load_explicit(&(_scan->next), memory_order_acquire); \
+                        } \
+                        if (_max != _outer) { \
+                                lfl_move_before(name, inst, _outer, _max); \
+                                _outer = _max; \
+                        } \
+                        _outer = atomic_load_explicit(&(_outer->next), memory_order_acquire); \
+                } \
+        } while (0)
