@@ -984,3 +984,26 @@ Test(lfl_sort, sort_descending)
 
         lfl_clear(test, mylist);
 }
+
+Test(lfl_iteration, foreach_rev_traverses_tail_to_head)
+{
+        lfl_vars(test, q);
+        lfl_init(test, q);
+
+        lfl_add_tail(test, q, n1);
+        n1->id = 1;
+        lfl_add_tail(test, q, n2);
+        n2->id = 2;
+        lfl_add_tail(test, q, n3);
+        n3->id = 3;
+
+        int expected[] = {3, 2, 1};
+        int idx = 0;
+        lfl_foreach_rev(test, q, item) {
+                cr_expect_eq(item->id, expected[idx], "rev order mismatch");
+                idx++;
+        }
+        cr_expect_eq(idx, 3);
+
+        lfl_clear(test, q);
+}

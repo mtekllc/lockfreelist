@@ -148,6 +148,24 @@
                     !atomic_load_explicit(&(item->removed), memory_order_acquire))
 
 /**
+ * @brief iterate over list items in reverse order
+ *
+ *        starts at the tail and walks toward the head while
+ *        skipping nodes flagged as removed. the previous
+ *        pointer is stored on each iteration so nodes may be
+ *        safely deleted inside the loop.
+ *
+ * @param name list type name
+ * @param inst list instance name
+ * @param item loop variable
+ */
+#define lfl_foreach_rev(name, inst, item) \
+        struct name##_linked_list *item = atomic_load_explicit(&(inst##_tail), memory_order_acquire), *item##_prev = NULL; \
+        for (; item != NULL; item = item##_prev) \
+                if ((item##_prev = atomic_load_explicit(&(item->prev), memory_order_acquire)), \
+                    !atomic_load_explicit(&(item->removed), memory_order_acquire))
+
+/**
  * @brief lock-free tail append using CAS
  *
  * @param name list type name

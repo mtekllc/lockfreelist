@@ -68,15 +68,23 @@ Atomically loads the next pointer of a node.
 ---
 
 ### `lfl_foreach(name, inst, item)`
-Safely iterates over **non-removed** nodes in the list.
 
-- Internally caches the `next` pointer before visiting the current node
+Use `lfl_foreach(name, inst, item)` to walk from the head to the tail while
+automatically skipping nodes marked as removed. `lfl_foreach_rev(name, inst,
+item)` performs the same traversal in reverse, starting from the tail.
+
+- Internally caches the `next`/`prev` pointers before visiting the current node
 - Allows `lfl_remove()` and `lfl_delete()` to be called safely inside the loop
 
 Example:
+
 ```c
-lfl_foreach(mytype, myqueue, node) {
-    printf("Node id = %d\n", node->id);
+lfl_foreach(mytype, myqueue, fwd) {
+    printf("Node id = %d\n", fwd->id);
+}
+
+lfl_foreach_rev(mytype, myqueue, rev) {
+    printf("Node id = %d\n", rev->id); /* prints in reverse order */
 }
 ```
 
