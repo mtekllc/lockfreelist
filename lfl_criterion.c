@@ -1007,3 +1007,26 @@ Test(lfl_iteration, foreach_rev_traverses_tail_to_head)
 
         lfl_clear(test, q);
 }
+
+Test(lfl_iteration, foreach_from_starts_at_given_node)
+{
+        lfl_vars(test, q);
+        lfl_init(test, q);
+
+        lfl_add_tail(test, q, n1);
+        n1->id = 1;
+        lfl_add_tail(test, q, n2);
+        n2->id = 2;
+        lfl_add_tail(test, q, n3);
+        n3->id = 3;
+
+        int expected[] = {2, 3};
+        int idx = 0;
+        lfl_foreach_from(test, q, item, n2) {
+                cr_expect_eq(item->id, expected[idx], "foreach_from order mismatch");
+                idx++;
+        }
+        cr_expect_eq(idx, 2);
+
+        lfl_clear(test, q);
+}

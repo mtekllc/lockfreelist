@@ -72,6 +72,8 @@ Atomically loads the next pointer of a node.
 Use `lfl_foreach(name, inst, item)` to walk from the head to the tail while
 automatically skipping nodes marked as removed. `lfl_foreach_rev(name, inst,
 item)` performs the same traversal in reverse, starting from the tail.
+`lfl_foreach_from(name, inst, item, node)` starts iteration at `node` instead
+of the head.
 
 - Internally caches the `next`/`prev` pointers before visiting the current node
 - Allows `lfl_remove()` and `lfl_delete()` to be called safely inside the loop
@@ -109,7 +111,7 @@ This avoids readers ever seeing partially populated structures.
 
 Example:
 ```c
-test_t *node = lfl_new(test);
+test_t *node = lfl_new(test); /* allocate node */
 node->id = 123;
 lfl_add_tail_ptr(test, myqueue, node);
 ```

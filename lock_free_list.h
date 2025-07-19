@@ -148,6 +148,23 @@
                     !atomic_load_explicit(&(item->removed), memory_order_acquire))
 
 /**
+ * @brief iterate from a specific node forward to the tail
+ *
+ *        stores the next pointer for safe removal/deletion just
+ *        like lfl_foreach but begins at the caller supplied node.
+ *
+ * @param name  list type name
+ * @param inst  list instance name
+ * @param item  loop variable
+ * @param start starting node pointer
+ */
+#define lfl_foreach_from(name, inst, item, start) \
+        struct name##_linked_list *item = (start), *item##_next = NULL; \
+        for (; item != NULL; item = item##_next) \
+                if ((item##_next = atomic_load_explicit(&(item->next), memory_order_acquire)), \
+                    !atomic_load_explicit(&(item->removed), memory_order_acquire))
+
+/**
  * @brief iterate over list items in reverse order
  *
  *        starts at the tail and walks toward the head while
@@ -343,12 +360,17 @@
         } while (0)
 
 /**
- * @brief lock-free search through the list using a condition
+ * @brief lock-free linear search of a list for matching field value
  *
- * @param name list type name
- * @param inst list instance name
- * @param item loop variable that will point to the match
- * @param cond expression to evaluate per item (e.g. item->id == 5)
+ *        performs a lock-free forward traversal of the list defined by
+ *        lfl_def/lfl_end macros. on match, assigns the matching node
+ *        to the given loop variable and exits.
+ *
+ * @param name   list type name (e.g., order, position)
+ * @param inst   list instance name (prefix for head)
+ * @param item   loop variable to receive the match
+ * @param field  atomic field name to test in each node
+ * @param value  value to compare against the field
  */
 #define lfl_find(name, inst, item, field, value) \
         struct name##_linked_list *item = NULL; \
@@ -356,7 +378,7 @@
                 struct name##_linked_list *name##_cursor = atomic_load_explicit(&(inst##_head), memory_order_acquire); \
                 while (name##_cursor) { \
                         if (!atomic_load_explicit(&name##_cursor->removed, memory_order_acquire)) { \
-                                if ((name##_cursor->field) == (value)) { \
+                                if (atomic_load(&name##_cursor->field) == (value)) { \
                                         item = name##_cursor; \
                                         break; \
                                 } \
